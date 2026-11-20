@@ -69,10 +69,10 @@ describe('ログイン', () => {
 })
 
 describe('得点入力', () => {
-  test('ログイン後、競技タブが A,B,D,C,E の順で、選んだ競技の試合数だけ試合タブが出る', async () => {
+  test('ログイン後、競技タブが A,B,C,D,E の順で、選んだ競技の試合数だけ試合タブが出る', async () => {
     const { user } = setup()
     const tabs = within(screen.getByRole('tablist', { name: '競技' })).getAllByRole('tab')
-    expect(tabs.map(t => t.textContent?.slice(0, 1))).toEqual(['A', 'B', 'D', 'C', 'E'])
+    expect(tabs.map(t => t.textContent?.slice(0, 1))).toEqual(['A', 'B', 'C', 'D', 'E'])
     expect(within(screen.getByRole('tablist', { name: '試合' })).getAllByRole('tab')).toHaveLength(4)
     await user.click(screen.getByRole('tab', { name: /ドッジボール/ }))
     expect(within(screen.getByRole('tablist', { name: '試合' })).getAllByRole('tab')).toHaveLength(2)
@@ -313,7 +313,19 @@ describe('隠す前の入力ガード（RED-004）', () => {
     const { user } = setup()
     await user.click(screen.getByRole('tab', { name: /メンターリレー/ }))
     await user.click(screen.getByRole('button', { name: '公開のまま入力する' }))
+    // One tap only asks again: publishing early can't be undone.
+    expect(teamArea('青組').getByRole('button', { name: '1点増やす' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '本当に公開のまま入力する' }))
     expect(teamArea('青組').getByRole('button', { name: '1点増やす' })).toBeEnabled()
+  })
+
+  test('「公開のまま入力する」の確認はキャンセルできる', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('tab', { name: /メンターリレー/ }))
+    await user.click(screen.getByRole('button', { name: '公開のまま入力する' }))
+    await user.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(screen.getByRole('button', { name: '公開のまま入力する' })).toBeInTheDocument()
+    expect(teamArea('青組').getByRole('button', { name: '1点増やす' })).toBeDisabled()
   })
 
   test('隠す対象でない競技には警告を出さない', () => {
@@ -549,6 +561,29 @@ describe('設定', () => {
       expect(screen.queryByRole('button', { name: '本当に発表する' })).not.toBeInTheDocument()
       expect(m.setResultsHidden).not.toHaveBeenCalled()
     } finally { vi.useRealTimers() }
+  })
+
+  test('実施順を変えて保存すると updateCompetition に order が入る', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('tab', { name: /メンターリレー/ }))
+    await user.click(screen.getByRole('button', { name: '設定' }))
+    const order = screen.getByLabelText('実施順（1 が最初）')
+    expect(order).toHaveValue('5')
+    await user.clear(order)
+    await user.type(order, '1')
+    await user.click(screen.getByRole('button', { name: '競技の設定を保存' }))
+    expect(m.updateCompetition).toHaveBeenCalledWith('E', expect.objectContaining({ order: 1 }))
+  })
+
+  test('実施順は 1〜10 の整数でなければ保存しない', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: '設定' }))
+    const order = screen.getByLabelText('実施順（1 が最初）')
+    await user.clear(order)
+    await user.type(order, '0')
+    await user.click(screen.getByRole('button', { name: '競技の設定を保存' }))
+    expect(m.updateCompetition).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('実施順は 1〜10')
   })
 
   test('満点の数え方を切り替えると updateSettings({ capMode }) が呼ばれる', async () => {

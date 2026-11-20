@@ -46,7 +46,7 @@ export async function setScore(id: CompetitionId, match: number, team: Team, val
 // Settings changes are logged in the same batch so disputes can be traced (server time).
 export async function updateCompetition(
   id: CompetitionId,
-  patch: Partial<Pick<Competition, 'name' | 'matchCount' | 'max' | 'presets'>>,
+  patch: Partial<Pick<Competition, 'name' | 'order' | 'matchCount' | 'max' | 'presets'>>,
 ): Promise<void> {
   const batch = writeBatch(db)
   batch.update(doc(db, 'competitions', id), patch)

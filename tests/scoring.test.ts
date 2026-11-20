@@ -15,8 +15,8 @@ const seedC = byId('C')
 const seedE = byId('E')
 
 describe('seed', () => {
-  test('seed は実施順 A,B,D,C,E', () =>
-    expect(sortByOrder(SEED_COMPETITIONS).map(c => c.id)).toEqual(['A', 'B', 'D', 'C', 'E']))
+  test('seed は実施順 A,B,C,D,E', () =>
+    expect(sortByOrder(SEED_COMPETITIONS).map(c => c.id)).toEqual(['A', 'B', 'C', 'D', 'E']))
 
   test('試合数とよく使う点数が企画書どおり', () => {
     expect(SEED_COMPETITIONS.map(c => [c.id, c.matchCount])).toEqual(

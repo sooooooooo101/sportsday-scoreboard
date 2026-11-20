@@ -14,6 +14,7 @@ type Props = {
 
 export function SettingsPanel({ competition: c, competitions, settings, onSaved }: Props) {
   const [name, setName] = useState(c.name)
+  const [order, setOrder] = useState(String(c.order))
   const [max, setMax] = useState(String(c.max))
   const [presets, setPresets] = useState(c.presets.join(', '))
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null)
@@ -29,7 +30,7 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
   useEffect(() => () => clearTimeout(revealTimer.current), [])
 
   useEffect(() => {
-    setName(c.name); setMax(String(c.max)); setPresets(c.presets.join(', ')); setMessage(null)
+    setName(c.name); setOrder(String(c.order)); setMax(String(c.max)); setPresets(c.presets.join(', ')); setMessage(null)
   }, [c.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fail = (text: string) => setMessage({ kind: 'error', text })
@@ -51,6 +52,8 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
   const saveCompetition = () => {
     const trimmed = name.trim()
     if (trimmed.length < 1 || trimmed.length > 30) return fail('競技名は 1〜30 文字で入力してください')
+    const o = parseScoreInput(order)
+    if (!o.ok || o.value < 1 || o.value > 10) return fail('実施順は 1〜10 の整数で入力してください')
     const m = parseScoreInput(max)
     if (!m.ok || m.value < 1 || m.value > 1000) return fail('満点は 1〜1000 の整数で入力してください')
     if (c.capped) {
@@ -62,7 +65,7 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
     if (parts.some(p => !p.ok) || parts.length > 6) return fail('よく使う点数は 0 以上の整数を 6 個までカンマ区切りで入力してください')
     const values = parts.map(p => (p as { value: number }).value)
     if (values.some(v => v > m.value)) return fail('よく使う点数は満点以下にしてください')
-    void run(() => updateCompetition(c.id, { name: trimmed, max: m.value, presets: values }), '競技の設定')
+    void run(() => updateCompetition(c.id, { name: trimmed, order: o.value, max: m.value, presets: values }), '競技の設定')
   }
 
   // Switching modes must not strand existing scores above the new cap (they could then
@@ -91,6 +94,10 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
       <label className="field">
         <span className="field__label">競技名</span>
         <input className="field__input" value={name} maxLength={30} onChange={e => setName(e.target.value)} />
+      </label>
+      <label className="field">
+        <span className="field__label">実施順（1 が最初）</span>
+        <input className="field__input" inputMode="numeric" value={order} onChange={e => setOrder(e.target.value)} />
       </label>
       <div className="field">
         <span className="field__label">試合数</span>

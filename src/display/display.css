@@ -44,7 +44,7 @@
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
-.team__hidden { opacity: 0.55; }
+.team__note { margin: 4px 0 0; font-size: 0.875rem; font-weight: 700; opacity: 0.75; }
 
 .reveal-note {
   margin: 16px 16px 0;

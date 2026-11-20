@@ -26,6 +26,7 @@ export function Scorer({ board }: { board: BoardState }) {
   const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [saved, setSaved] = useState<Saved | null>(null)
   const [publicOk, setPublicOk] = useState<Set<CompetitionId>>(new Set())
+  const [confirmPublic, setConfirmPublic] = useState(false)
   const popupTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const popupSeq = useRef(0)
   const showSaved = (text: string, sub: string) => {
@@ -103,7 +104,7 @@ export function Scorer({ board }: { board: BoardState }) {
           panelId="score-panel"
           items={competitions.map(c => ({ key: c.id, label: c.id, ariaLabel: `${c.id} ${c.name}` }))}
           selected={comp.id}
-          onSelect={k => { setSelected(k as CompetitionId); setMatch(1); setInvalid(null) }}
+          onSelect={k => { setSelected(k as CompetitionId); setMatch(1); setInvalid(null); setConfirmPublic(false) }}
         />
         <div className="admin__actions">
           <button className="btn btn--ghost" type="button" aria-pressed={showSettings} onClick={() => setShowSettings(s => !s)}>設定</button>
@@ -134,7 +135,16 @@ export function Scorer({ board }: { board: BoardState }) {
             <div className="msg msg--error guard" role="alert">
               <p>まだ結果を隠していません。このまま入れると、表示画面にすぐ点数が出ます。</p>
               <div className="confirm__actions">
-                <button className="btn" type="button" onClick={() => setPublicOk(s => new Set(s).add(comp.id))}>公開のまま入力する</button>
+                {/* Two steps: publishing a to-be-hidden competition early can't be undone. */}
+                {confirmPublic ? (
+                  <>
+                    <button className="btn" type="button" onClick={() => setConfirmPublic(false)}>キャンセル</button>
+                    <button className="btn btn--danger" type="button"
+                      onClick={() => { setConfirmPublic(false); setPublicOk(s => new Set(s).add(comp.id)) }}>本当に公開のまま入力する</button>
+                  </>
+                ) : (
+                  <button className="btn" type="button" onClick={() => setConfirmPublic(true)}>公開のまま入力する</button>
+                )}
                 <button className="btn btn--primary" type="button" onClick={() => {
                   void setResultsHidden(true, settings.hideFromOrder, competitions)
                     .then(() => showSaved('結果を隠しました', '表示画面は「?」になります'))

@@ -138,7 +138,7 @@ test('setResultsHidden は settings と、hideFromOrder 以降の競技の hidde
     const snap = await getDocs(collection(fb.db, 'competitions'))
     return Object.fromEntries(snap.docs.map(d => [d.id, d.data().hidden ?? false]))
   }
-  expect(await read()).toEqual({ A: false, B: false, C: true, D: false, E: true })
+  expect(await read()).toEqual({ A: false, B: false, C: false, D: true, E: true })
   await api.setResultsHidden(false, 4, SEED_COMPETITIONS)
   expect(await read()).toEqual({ A: false, B: false, C: false, D: false, E: false })
 })

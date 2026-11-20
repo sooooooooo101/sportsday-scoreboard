@@ -18,23 +18,24 @@ test('合計点を青と白それぞれに表示する', () => {
   expect(screen.getByRole('region', { name: '青組 97点' })).toBeInTheDocument()
 })
 
-test('内訳を A,B,D,C,E の順に、競技名と青・白の小計つきで並べる', () => {
+test('内訳を A,B,C,D,E の順に、競技名と青・白の小計つきで並べる', () => {
   render(<Display board={board({ competitions: scored })} />)
   openBreakdown()
   const rows = screen.getAllByRole('listitem')
-  expect(rows.map(r => r.getAttribute('data-id'))).toEqual(['A', 'B', 'D', 'C', 'E'])
-  const c = within(rows[3])
+  expect(rows.map(r => r.getAttribute('data-id'))).toEqual(['A', 'B', 'C', 'D', 'E'])
+  const c = within(rows[2])
   expect(c.getByText('ドッジボール')).toBeInTheDocument()
   expect(c.getByTestId('sub-blue')).toHaveTextContent('40')
   expect(c.getByTestId('sub-white')).toHaveTextContent('10')
 })
 
-test('hiddenIds に E があるとき、合計と E の小計が「?」で、「結果は閉会式で発表」が表示される', () => {
+test('hiddenIds に E があるとき、合計は A〜D の分を表示し、E の小計だけ「?」で、「結果は閉会式で発表」が表示される', () => {
   const visible = scored.filter(c => c.id !== 'E')
   render(<Display board={board({ competitions: visible, hiddenIds: ['E'], settings: { ...SEED_SETTINGS, hidden: true } })} />)
-  expect(screen.getByTestId('total-blue')).toHaveTextContent('?')
-  expect(screen.getByTestId('total-white')).toHaveTextContent('?')
-  expect(screen.getByTestId('total-blue')).not.toHaveTextContent('47')
+  // A 7 + C 40 = 47 (blue), A 5 + C 10 = 15 (white): only what the visible breakdown already shows.
+  expect(screen.getByTestId('total-blue')).toHaveTextContent('47')
+  expect(screen.getByTestId('total-white')).toHaveTextContent('15')
+  expect(screen.getAllByText('最後の競技を除く')).toHaveLength(2)
   openBreakdown()
   const e = within(screen.getAllByRole('listitem').find(r => r.getAttribute('data-id') === 'E')!)
   expect(e.getByTestId('sub-blue')).toHaveTextContent('?')
@@ -67,9 +68,11 @@ test('ready=false の間は「読み込み中」を表示し、途中の合計�
   expect(screen.queryByTestId('total-blue')).not.toBeInTheDocument()
 })
 
-test('settings.hidden=true なら、hiddenIds が空でも合計は「?」', () => {
-  render(<Display board={board({ competitions: scored.slice(0, 3), hiddenIds: [], settings: { ...SEED_SETTINGS, hidden: true } })} />)
-  expect(screen.getByTestId('total-blue')).toHaveTextContent('?')
+test('settings.hidden=true なら、E のデータがまだ残っていても合計に入れない', () => {
+  // E may still be in the board for a moment before its listener is denied.
+  render(<Display board={board({ competitions: scored, hiddenIds: [], settings: { ...SEED_SETTINGS, hidden: true } })} />)
+  expect(screen.getByTestId('total-blue')).toHaveTextContent('47')
+  expect(screen.getByTestId('total-blue')).not.toHaveTextContent('97')
   expect(screen.getByText('結果は閉会式で発表')).toBeInTheDocument()
 })
 
