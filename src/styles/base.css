@@ -10,7 +10,17 @@
   --line: rgba(20, 22, 26, 0.08);
   --danger: #d92d20;
   --ok: #12805c;
-  --radius: 16px;
+  --ink-3: #8a90a0;
+  /* Spacing and radius scale (4/8/12/16/24/32 and 8/12/20), shared by both screens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 20px;
   color-scheme: light;
   font: 100%/1.5 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
   -webkit-text-size-adjust: 100%;

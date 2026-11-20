@@ -40,7 +40,7 @@ export function Scorer({ board }: { board: BoardState }) {
   useEffect(() => () => { clearTimeout(undoTimer.current); clearTimeout(popupTimer.current) }, [])
 
   if (!board.ready || !board.settings || competitions.length === 0) {
-    if (!board.ready || !board.connected) return <main className="admin"><p className="loading">読み込み中</p></main>
+    if (!board.ready || !board.connected) return <AdminLoading />
     return (
       <main className="admin admin--empty">
         <p>まだ競技のデータがありません。</p>
@@ -171,6 +171,29 @@ export function Scorer({ board }: { board: BoardState }) {
       {!board.connected && <p className="offline-pill" role="status">再接続中…</p>}
       <SavedPopup saved={saved} />
       <UndoToast status={status} errorKind={errorKind} canUndo={undo !== null} onUndo={doUndo} onDismiss={dismiss} />
+    </main>
+  )
+}
+
+/**
+ * Loading that never finishes usually means this phone's session can no longer refresh
+ * (e.g. the scorer account was replaced). Offer a way back to the login screen.
+ */
+function AdminLoading() {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 5000)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <main className="admin admin--empty">
+      <p className="loading loading--inline">読み込み中</p>
+      {slow && (
+        <>
+          <p className="field__hint">読み込めない場合は、ログインし直してください。</p>
+          <button className="btn" type="button" onClick={() => void signOutScorer()}>ログインし直す</button>
+        </>
+      )}
     </main>
   )
 }

@@ -211,6 +211,20 @@ describe('得点入力', () => {
     expect(m.setScore).toHaveBeenCalledTimes(1)
   })
 
+  test('読み込みが 5 秒以上終わらなければ「ログインし直す」を出し、押すとログアウトする', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      // e.g. the scorer account was replaced and this phone's old session can't refresh
+      current = board({ settings: null, competitions: [], ready: false, connected: false })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      render(<AdminApp />)
+      expect(screen.queryByRole('button', { name: 'ログインし直す' })).not.toBeInTheDocument()
+      await act(async () => { vi.advanceTimersByTime(5100) })
+      await user.click(screen.getByRole('button', { name: 'ログインし直す' }))
+      expect(m.signOutScorer).toHaveBeenCalled()
+    } finally { vi.useRealTimers() }
+  })
+
   test('ready=false の間は「初期データを作成」を出さない', () => {
     current = board({ settings: null, competitions: [], ready: false })
     setup()

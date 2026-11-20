@@ -33,7 +33,7 @@ export function Display({ board }: { board: BoardState }) {
   return (
     <main className="display">
       <h1 className="visually-hidden">体育祭 2026 得点ボード</h1>
-      <div className="teams">
+      <div className={`teams${partial ? ' teams--partial' : ''}`}>
         <TeamPanel team="blue" total={totals.blue} partial={partial} />
         <TeamPanel team="white" total={totals.white} partial={partial} />
       </div>
