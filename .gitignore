@@ -1,0 +1,9 @@
+node_modules
+dist
+.env*.local
+.superpowers
+*.log
+.firebase
+firebase-debug.log
+firestore-debug.log
+.deploy

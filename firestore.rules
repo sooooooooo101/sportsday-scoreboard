@@ -1,0 +1,144 @@
+rules_version = '2';
+
+// SCORER_UID is a marker: `npm run deploy` writes .deploy/firestore.rules with the real uid.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == 'SCORER_UID';
+    }
+
+    function appSettings() {
+      return get(/databases/$(database)/documents/settings/app).data;
+    }
+
+    // getAfter so the very first batch (competitions + settings together) can be checked.
+    function capModeAfter() {
+      return getAfter(/databases/$(database)/documents/settings/app).data.capMode;
+    }
+
+    function isInt(v, lo, hi) {
+      return v is int && v >= lo && v <= hi;
+    }
+
+    // Matches beyond matchCount may only hold zeros, so a score can never
+    // silently drop out of the totals when the match count is reduced.
+    function validMatch(s, k, n, max, mc) {
+      return !(k in s) || (
+        s[k] is map
+        && s[k].keys().hasOnly(['blue', 'white'])
+        && (!('blue' in s[k]) || isInt(s[k].blue, 0, max))
+        && (!('white' in s[k]) || isInt(s[k].white, 0, max))
+        && (n <= mc || (s[k].get('blue', 0) == 0 && s[k].get('white', 0) == 0))
+      );
+    }
+
+    // Rules have no loops, so every allowed match key is checked explicitly.
+    function validScores(s, max, mc) {
+      return s is map
+        && s.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])
+        && validMatch(s, '1', 1, max, mc)
+        && validMatch(s, '2', 2, max, mc)
+        && validMatch(s, '3', 3, max, mc)
+        && validMatch(s, '4', 4, max, mc)
+        && validMatch(s, '5', 5, max, mc)
+        && validMatch(s, '6', 6, max, mc)
+        && validMatch(s, '7', 7, max, mc)
+        && validMatch(s, '8', 8, max, mc)
+        && validMatch(s, '9', 9, max, mc)
+        && validMatch(s, '10', 10, max, mc);
+    }
+
+    function sumTeam(s, t) {
+      return s.get('1', {}).get(t, 0) +
+        s.get('2', {}).get(t, 0) +
+        s.get('3', {}).get(t, 0) +
+        s.get('4', {}).get(t, 0) +
+        s.get('5', {}).get(t, 0) +
+        s.get('6', {}).get(t, 0) +
+        s.get('7', {}).get(t, 0) +
+        s.get('8', {}).get(t, 0) +
+        s.get('9', {}).get(t, 0) +
+        s.get('10', {}).get(t, 0);
+    }
+
+    // Evaluated on the merged post-write document, and the server applies writes to one
+    // document one at a time, so concurrent entries on different matches cannot exceed max.
+    function withinCap(d) {
+      return d.capped == false || (
+        capModeAfter() == 'perTeam'
+          ? sumTeam(d.scores, 'blue') <= d.max && sumTeam(d.scores, 'white') <= d.max
+          : sumTeam(d.scores, 'blue') + sumTeam(d.scores, 'white') <= d.max
+      );
+    }
+
+    function validCompetition(d, id) {
+      let fields = ['id', 'name', 'order', 'matchCount', 'max', 'capped', 'presets', 'scores'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.id == id
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 30
+        && isInt(d.order, 1, 10)
+        && isInt(d.matchCount, 1, 10)
+        && isInt(d.max, 1, 1000)
+        && d.capped is bool
+        && d.presets is list && d.presets.size() <= 6
+        && validScores(d.scores, d.capped ? d.max : 1000, d.matchCount)
+        && withinCap(d);
+    }
+
+    function validSettings(d) {
+      let fields = ['capMode', 'hideFromOrder', 'hidden'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.capMode in ['shared', 'perTeam']
+        && d.hidden is bool
+        && isInt(d.hideFromOrder, 1, 10);
+    }
+
+    function hasExactly(d, fields) {
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields);
+    }
+
+    function validLog(d) {
+      return d.at == request.time && (
+        (d.kind == 'score'
+          && hasExactly(d, ['kind', 'id', 'match', 'team', 'from', 'to', 'at'])
+          && d.id in ['A', 'B', 'C', 'D', 'E']
+          && isInt(d.match, 1, 10)
+          && d.team in ['blue', 'white']
+          && isInt(d.from, 0, 1000)
+          && isInt(d.to, 0, 1000))
+        || (d.kind == 'settings'
+          && hasExactly(d, ['kind', 'patch', 'at'])
+          && d.patch is map && d.patch.size() <= 3)
+        || (d.kind == 'competition'
+          && hasExactly(d, ['kind', 'id', 'patch', 'at'])
+          && d.id in ['A', 'B', 'C', 'D', 'E']
+          && d.patch is map && d.patch.size() <= 6)
+      );
+    }
+
+    match /competitions/{id} {
+      // While results are hidden, later competitions are unreadable to the public,
+      // otherwise the score data could be read from devtools.
+      allow read: if isAdmin()
+        || !appSettings().hidden
+        || resource.data.order < appSettings().hideFromOrder;
+      allow create, update: if isAdmin()
+        && id in ['A', 'B', 'C', 'D', 'E']
+        && validCompetition(request.resource.data, id);
+      allow delete: if false;
+    }
+
+    match /settings/{docId} {
+      allow read: if docId == 'app';
+      allow create, update: if isAdmin() && docId == 'app' && validSettings(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /log/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validLog(request.resource.data);
+      allow update, delete: if false;
+    }
+  }
+}

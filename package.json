@@ -1,0 +1,38 @@
+{
+  "name": "sportsday-scoreboard",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc -b --noEmit",
+    "test:emu": "firebase emulators:exec --only firestore,auth --project demo-sportsday \"EMU=1 vitest run tests/rules.test.ts tests/data.emulator.test.ts\"",
+    "deploy": "node scripts/build-rules.ts && npm run build && node scripts/move-admin.ts && firebase deploy --config firebase.deploy.json --only hosting,firestore:rules"
+  },
+  "dependencies": {
+    "firebase": "^13.4.0",
+    "motion": "^14.14.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.13",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "firebase-tools": "^15.37.0",
+    "jsdom": "^31.0.1",
+    "oxlint": "^1.90.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.1"
+  }
+}
