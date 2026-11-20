@@ -15,6 +15,7 @@ vi.mock('../src/admin/adminApi', () => ({
   setScore: vi.fn(async () => 0),
   updateCompetition: vi.fn(async () => {}),
   updateSettings: vi.fn(async () => {}),
+  setResultsHidden: vi.fn(async () => {}),
   seedIfEmpty: vi.fn(async () => true),
 }))
 // jsdom can't run motion's exit animations, so presence is a pass-through here;
@@ -293,6 +294,34 @@ describe('得点入力', () => {
   })
 })
 
+describe('隠す前の入力ガード（RED-004）', () => {
+  test('結果を隠していないのに隠す対象の競技を開くと、警告を出して入力を止める', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('tab', { name: /メンターリレー/ }))
+    expect(screen.getByRole('alert')).toHaveTextContent('まだ結果を隠していません')
+    expect(teamArea('青組').getByRole('button', { name: '1点増やす' })).toBeDisabled()
+  })
+
+  test('「先に隠す」で setResultsHidden(true) を呼ぶ', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('tab', { name: /メンターリレー/ }))
+    await user.click(screen.getByRole('button', { name: '先に隠す' }))
+    expect(m.setResultsHidden).toHaveBeenCalledWith(true, 5, expect.any(Array))
+  })
+
+  test('「公開のまま入力する」を選べば入力できる', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('tab', { name: /メンターリレー/ }))
+    await user.click(screen.getByRole('button', { name: '公開のまま入力する' }))
+    expect(teamArea('青組').getByRole('button', { name: '1点増やす' })).toBeEnabled()
+  })
+
+  test('隠す対象でない競技には警告を出さない', () => {
+    setup()
+    expect(screen.queryByText('まだ結果を隠していません')).not.toBeInTheDocument()
+  })
+})
+
 describe('玉入れの途中計算', () => {
   const openB = async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('tab', { name: /玉入れ改/ }))
   const tally = () => within(screen.getByRole('group', { name: '青組の途中計算' }))
@@ -380,7 +409,26 @@ describe('玉入れの途中計算', () => {
     await openB(user)
     await user.click(tally().getByRole('button', { name: '入った玉を1つ増やす' }))
     await user.click(tally().getByRole('button', { name: 'リセット' }))
+    // One tap only arms it, so a slip next to 点数決定 can't wipe a long count.
+    expect(tally().getByTestId('tally-result')).toHaveTextContent('1 − 0 = 1点')
+    await user.click(tally().getByRole('button', { name: '本当にリセット' }))
     expect(tally().getByTestId('tally-result')).toHaveTextContent('0 − 0 = 0点')
+  })
+
+  test('何も数えていないときは点数決定を押せない', async () => {
+    const { user } = setup()
+    await openB(user)
+    expect(tally().getByRole('button', { name: '点数決定' })).toBeDisabled()
+  })
+
+  test('保存の完了待ちの間は数を変えられない', async () => {
+    m.setScore.mockImplementationOnce(() => new Promise(() => {}))
+    const { user } = setup()
+    await openB(user)
+    await user.click(tally().getByRole('button', { name: '入った玉を1つ増やす' }))
+    await user.click(tally().getByRole('button', { name: '点数決定' }))
+    expect(tally().getByRole('button', { name: '入った玉を1つ増やす' })).toBeDisabled()
+    expect(tally().getByRole('button', { name: '入った玉を1つ戻す' })).toBeDisabled()
   })
 
   test('3 時間以上前の途中の数は捨てる', async () => {
@@ -418,18 +466,18 @@ describe('設定', () => {
     expect(m.updateCompetition).toHaveBeenCalledWith('E', expect.objectContaining({ name: '新リレー' }))
   })
 
-  test('「この競技から隠す」で updateSettings({ hidden: true })、「発表する」は2回押すと updateSettings({ hidden: false })', async () => {
+  test('「この競技から隠す」で setResultsHidden(true)、「発表する」は確認してから setResultsHidden(false)', async () => {
     const { user, rerender } = setup()
     await user.click(screen.getByRole('button', { name: '設定' }))
     await user.click(screen.getByRole('button', { name: /メンターリレー.*から隠す/ }))
-    expect(m.updateSettings).toHaveBeenCalledWith({ hidden: true })
+    expect(m.setResultsHidden).toHaveBeenCalledWith(true, 5, expect.any(Array))
     current = board({ settings: { capMode: 'shared', hideFromOrder: 5, hidden: true } })
     act(() => push!(current))
     rerender(<AdminApp />)
     await user.click(screen.getByRole('button', { name: '発表する' }))
-    expect(m.updateSettings).not.toHaveBeenCalledWith({ hidden: false })
+    expect(m.setResultsHidden).not.toHaveBeenCalledWith(false, expect.anything(), expect.anything())
     await user.click(screen.getByRole('button', { name: '本当に発表する' }))
-    expect(m.updateSettings).toHaveBeenCalledWith({ hidden: false })
+    expect(m.setResultsHidden).toHaveBeenCalledWith(false, 5, expect.any(Array))
   })
 
   test('満点を、今入っている合計より低くはできない', async () => {
@@ -466,6 +514,41 @@ describe('設定', () => {
     expect(await screen.findByTestId('saved-popup')).toHaveTextContent('満点の数え方')
     await user.click(screen.getByRole('button', { name: /から隠す/ }))
     expect(await screen.findByTestId('saved-popup')).toHaveTextContent('結果を隠しました')
+  })
+
+  test('よく使う点数の欄は数字専用キーボードにしない（カンマを打てるように）', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: '設定' }))
+    expect(screen.getByLabelText('よく使う点数（カンマ区切り）')).not.toHaveAttribute('inputmode', 'numeric')
+  })
+
+  test('今の点数が新しい数え方の満点を超えるなら、満点の数え方を切り替えない', async () => {
+    current = board({
+      settings: { capMode: 'perTeam', hideFromOrder: 5, hidden: false },
+      competitions: comps({ C: { '1': { blue: 60, white: 60 } } }),
+    })
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: '設定' }))
+    await user.click(screen.getByRole('radio', { name: /青と白の合計/ }))
+    expect(m.updateSettings).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('ドッジボール')
+  })
+
+  test('発表の確認はキャンセルでき、押さなければ 5 秒で元に戻る', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      current = board({ settings: { capMode: 'shared', hideFromOrder: 5, hidden: true } })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      render(<AdminApp />)
+      await user.click(screen.getByRole('button', { name: '設定' }))
+      await user.click(screen.getByRole('button', { name: '発表する' }))
+      await user.click(screen.getByRole('button', { name: 'キャンセル' }))
+      expect(screen.getByRole('button', { name: '発表する' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '発表する' }))
+      await act(async () => { vi.advanceTimersByTime(5100) })
+      expect(screen.queryByRole('button', { name: '本当に発表する' })).not.toBeInTheDocument()
+      expect(m.setResultsHidden).not.toHaveBeenCalled()
+    } finally { vi.useRealTimers() }
   })
 
   test('満点の数え方を切り替えると updateSettings({ capMode }) が呼ばれる', async () => {

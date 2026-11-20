@@ -37,23 +37,28 @@ type Props = {
 export function TallyCounter({ storageKey, team, mode, onDecide }: Props) {
   const [c, setC] = useState<Counts>(() => load(storageKey))
   const [busy, setBusy] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
   useEffect(() => { store(storageKey, c) }, [storageKey, c])
 
   const limits: Counts = mode === 'bonus' ? { plus: BONUS_BALLS, minus: 0 } : { plus: PLUS_BALLS, minus: MINUS_BALLS }
   const result = mode === 'bonus' ? bonusPoints(c.plus) : Math.max(0, c.plus - c.minus)
-  const bump = (k: keyof Counts, d: number) =>
+  const empty = c.plus === 0 && c.minus === 0
+  const bump = (k: keyof Counts, d: number) => {
+    setConfirmReset(false)
     setC(prev => ({ ...prev, [k]: Math.min(limits[k], Math.max(0, prev[k] + d)) }))
+  }
   const decide = async () => {
     setBusy(true)
+    setConfirmReset(false)
     try { if (await onDecide(result)) setC(ZERO) } finally { setBusy(false) }
   }
 
   const row = (k: keyof Counts, phase: string, what: string, sign: string) => (
     <div className="tally__row">
       <span className="tally__label">{phase}<small>{what}（{limits[k]}まで）</small></span>
-      <button className="tally__undo" type="button" aria-label={`${what}を1つ戻す`} disabled={c[k] === 0} onClick={() => bump(k, -1)}>戻す</button>
+      <button className="tally__undo" type="button" aria-label={`${what}を1つ戻す`} disabled={busy || c[k] === 0} onClick={() => bump(k, -1)}>戻す</button>
       <span className="tally__count" aria-live="polite">{c[k]}</span>
-      <button className="tally__add" type="button" aria-label={`${what}を1つ増やす`} disabled={c[k] >= limits[k]} onClick={() => bump(k, 1)}>{sign}1</button>
+      <button className="tally__add" type="button" aria-label={`${what}を1つ増やす`} disabled={busy || c[k] >= limits[k]} onClick={() => bump(k, 1)}>{sign}1</button>
     </div>
   )
 
@@ -73,8 +78,13 @@ export function TallyCounter({ storageKey, team, mode, onDecide }: Props) {
         </>
       )}
       <div className="tally__actions">
-        <button className="btn tally__reset" type="button" disabled={busy || (c.plus === 0 && c.minus === 0)} onClick={() => setC(ZERO)}>リセット</button>
-        <button className="btn btn--primary tally__decide" type="button" disabled={busy} onClick={() => void decide()}>点数決定</button>
+        {/* Two taps to reset: it sits next to 点数決定 and a slip would lose a long count. */}
+        <button className={`btn tally__reset${confirmReset ? ' btn--danger' : ''}`} type="button" disabled={busy || empty}
+          onClick={() => { if (confirmReset) { setC(ZERO); setConfirmReset(false) } else setConfirmReset(true) }}>
+          {confirmReset ? '本当にリセット' : 'リセット'}
+        </button>
+        {/* Nothing counted yet: saving would overwrite the score with 0 by accident. */}
+        <button className="btn btn--primary tally__decide" type="button" disabled={busy || empty} onClick={() => void decide()}>点数決定</button>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { collection, doc, getDoc, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore'
-import { auth, db } from '../shared/firebase'
+import { db } from '../shared/firebase'
+import { auth } from './auth'
 import { SEED_COMPETITIONS, SEED_SETTINGS } from '../shared/seed'
 import type { Competition, CompetitionId, Settings, Team } from '../shared/types'
 
@@ -57,6 +58,23 @@ export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   const batch = writeBatch(db)
   batch.update(doc(db, 'settings', 'app'), patch)
   batch.set(doc(collection(db, 'log')), { kind: 'settings', patch, at: serverTimestamp() })
+  await batch.commit()
+}
+
+/**
+ * Hide or reveal in one batch: the settings flag plus a per-competition flag, which is
+ * what the rules check on public reads (RED-006: no extra get() per read).
+ */
+export async function setResultsHidden(
+  hidden: boolean,
+  hideFromOrder: number,
+  competitions: Pick<Competition, 'id' | 'order'>[],
+): Promise<void> {
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'settings', 'app'), { hidden })
+  for (const c of competitions)
+    batch.update(doc(db, 'competitions', c.id), { hidden: hidden && c.order >= hideFromOrder })
+  batch.set(doc(collection(db, 'log')), { kind: 'settings', patch: { hidden }, at: serverTimestamp() })
   await batch.commit()
 }
 

@@ -28,20 +28,27 @@ describe('読み取り', () => {
     await assertSucceeds(getDoc(doc(anon(), 'settings', 'app')))
   })
 
-  test('hidden=true かつ order>=hideFromOrder の競技は、未ログインでは読めないが、得点係は読める', async () => {
-    await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden: true }))
+  // RED-006: hiding is a flag on each competition doc, so reads need no extra get().
+  const hideE = () => env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'competitions', 'E'), { hidden: true }))
+
+  test('hidden=true の競技は、未ログインでは読めないが、得点係は読める', async () => {
+    await hideE()
     await assertFails(getDoc(doc(anon(), 'competitions', 'E')))
     await assertSucceeds(getDoc(doc(anon(), 'competitions', 'C')))
     await assertSucceeds(getDoc(doc(scorer(), 'competitions', 'E')))
   })
 
-  test('hidden=false なら E も未ログインで読める', async () => {
+  test('hidden を持たない（以前からある）競技ドキュメントも未ログインで読める', async () => {
     await assertSucceeds(getDoc(doc(anon(), 'competitions', 'E')))
   })
 
-  test('隠している間は、未ログインで competitions 全体を一覧取得できない', async () => {
-    await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden: true }))
+  test('A〜E 以外の競技 ID は、未ログインでは読めない', async () => {
+    await assertFails(getDoc(doc(anon(), 'competitions', 'Z')))
+  })
+
+  test('未ログインでは competitions を一覧取得できない（隠していなくても）。得点係はできる', async () => {
     await assertFails(getDocs(collection(anon(), 'competitions')))
+    await assertSucceeds(getDocs(collection(scorer(), 'competitions')))
   })
 })
 
@@ -94,6 +101,11 @@ describe('書き込み', () => {
     await assertFails(updateDoc(ref, { presets: [1, 2, 3, 4, 5, 6, 7] }))
     await assertFails(updateDoc(ref, { extra: true }))
     await assertSucceeds(updateDoc(ref, { name: 'ドッジ', matchCount: 3, presets: [40, 25, 10] }))
+  })
+
+  test('得点係は競技の hidden を true/false にでき、それ以外の値は拒否される', async () => {
+    await assertSucceeds(updateDoc(doc(scorer(), 'competitions', 'E'), { hidden: true }))
+    await assertFails(updateDoc(doc(scorer(), 'competitions', 'E'), { hidden: 'yes' }))
   })
 
   test('A〜E 以外の競技ドキュメントは作れない', async () => {

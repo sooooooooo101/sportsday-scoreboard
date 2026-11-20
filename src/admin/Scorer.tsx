@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseScoreInput, sortByOrder, validateScore } from '../shared/scoring'
 import type { BoardState } from '../shared/subscribe'
 import { TEAM_LABEL, type CompetitionId, type Team } from '../shared/types'
-import { seedIfEmpty, setScore, signOutScorer } from './adminApi'
+import { seedIfEmpty, setResultsHidden, setScore, signOutScorer } from './adminApi'
 import { SavedPopup, type Saved } from './SavedPopup'
 import { SettingsPanel } from './SettingsPanel'
 import { tabId, Tabs } from './Tabs'
@@ -25,6 +25,7 @@ export function Scorer({ board }: { board: BoardState }) {
   const [seedError, setSeedError] = useState<string | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [saved, setSaved] = useState<Saved | null>(null)
+  const [publicOk, setPublicOk] = useState<Set<CompetitionId>>(new Set())
   const popupTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const popupSeq = useRef(0)
   const showSaved = (text: string, sub: string) => {
@@ -54,6 +55,8 @@ export function Scorer({ board }: { board: BoardState }) {
     )
   }
   const settings = board.settings
+  // RED-004: entering a to-be-hidden competition before hiding would publish it instantly.
+  const guarded = !settings.hidden && comp.order >= settings.hideFromOrder && !publicOk.has(comp.id)
 
   // Firestore applies local writes to the snapshot immediately, so the board is the single source of truth.
   const valueOf = (team: Team) => comp.scores[String(match)]?.[team] ?? 0
@@ -127,8 +130,20 @@ export function Scorer({ board }: { board: BoardState }) {
             onSelect={k => { setMatch(Number(k)); setInvalid(null) }}
           />
           <div role="tabpanel" id="score-panel" aria-labelledby={tabId('match', String(match))} className="panel">
-          {invalid && <p className="msg msg--error" role="alert">{invalid}</p>}
-          <div className="pads">
+          {guarded ? (
+            <div className="msg msg--error guard" role="alert">
+              <p>まだ結果を隠していません。このまま入れると、表示画面にすぐ点数が出ます。</p>
+              <div className="confirm__actions">
+                <button className="btn" type="button" onClick={() => setPublicOk(s => new Set(s).add(comp.id))}>公開のまま入力する</button>
+                <button className="btn btn--primary" type="button" onClick={() => {
+                  void setResultsHidden(true, settings.hideFromOrder, competitions)
+                    .then(() => showSaved('結果を隠しました', '表示画面は「?」になります'))
+                    .catch(() => setInvalid('隠せませんでした。通信を確認してもう一度押してください'))
+                }}>先に隠す</button>
+              </div>
+            </div>
+          ) : invalid && <p className="msg msg--error" role="alert">{invalid}</p>}
+          <fieldset className="pads" disabled={guarded}>
             {(['blue', 'white'] as const).map(team => (
               <div key={`${comp.id}-${match}-${team}`} className="pad-stack">
                 <TeamInput team={team} value={valueOf(team)} presets={comp.presets}
@@ -139,7 +154,7 @@ export function Scorer({ board }: { board: BoardState }) {
                 )}
               </div>
             ))}
-          </div>
+          </fieldset>
           </div>
         </>
       )}

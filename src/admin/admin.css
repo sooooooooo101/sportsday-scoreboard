@@ -233,3 +233,9 @@
 .tally__hint { margin: 0; text-align: center; font-size: 0.8125rem; color: var(--ink-2); font-weight: 600; }
 .tally__actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 .tally__reset { min-width: 88px; }
+
+fieldset.pads { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset.pads:disabled { opacity: 0.5; }
+.guard p, .confirm__text { margin: 0 0 10px; }
+.confirm { padding: 12px; border-radius: 12px; background: #fdecea; }
+.confirm__actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }

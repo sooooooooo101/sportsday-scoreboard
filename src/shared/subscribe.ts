@@ -78,6 +78,8 @@ export function subscribeBoard(
       snap => {
         attempts.delete(id)
         resolved.add(id)
+        // A fresh server snapshot proves the connection is back (e.g. after a retry).
+        if (!snap.metadata.fromCache) connected = true
         if (!snap.exists()) { comps.delete(id); hidden.delete(id); emit(); return }
         const c = snap.data() as Competition
         lastOrder.set(id, c.order)

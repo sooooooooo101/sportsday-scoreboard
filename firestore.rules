@@ -8,10 +8,6 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == 'SCORER_UID';
     }
 
-    function appSettings() {
-      return get(/databases/$(database)/documents/settings/app).data;
-    }
-
     // getAfter so the very first batch (competitions + settings together) can be checked.
     function capModeAfter() {
       return getAfter(/databases/$(database)/documents/settings/app).data.capMode;
@@ -74,7 +70,9 @@ service cloud.firestore {
 
     function validCompetition(d, id) {
       let fields = ['id', 'name', 'order', 'matchCount', 'max', 'capped', 'presets', 'scores'];
-      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+      // hidden is optional so documents created before it existed stay valid.
+      return d.keys().hasOnly(fields.concat(['hidden'])) && d.keys().hasAll(fields)
+        && (!('hidden' in d) || d.hidden is bool)
         && d.id == id
         && d.name is string && d.name.size() >= 1 && d.name.size() <= 30
         && isInt(d.order, 1, 10)
@@ -118,11 +116,12 @@ service cloud.firestore {
     }
 
     match /competitions/{id} {
-      // While results are hidden, later competitions are unreadable to the public,
-      // otherwise the score data could be read from devtools.
-      allow read: if isAdmin()
-        || !appSettings().hidden
-        || resource.data.order < appSettings().hideFromOrder;
+      // While results are hidden, those competitions are unreadable to the public, otherwise
+      // the score data could be read from devtools. The flag lives on each doc (RED-006): no
+      // extra get() per read, no reads of unknown ids, and no public list queries.
+      allow get: if isAdmin()
+        || (id in ['A', 'B', 'C', 'D', 'E'] && resource.data.get('hidden', false) == false);
+      allow list: if isAdmin();
       allow create, update: if isAdmin()
         && id in ['A', 'B', 'C', 'D', 'E']
         && validCompetition(request.resource.data, id);

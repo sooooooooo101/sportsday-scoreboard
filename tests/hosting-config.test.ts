@@ -19,3 +19,6 @@ test('ハッシュ付きのアセットは長くキャッシュする', () =>
 
 test('デプロイ用設定の hosting は firebase.json と同じ', () =>
   expect(load('firebase.deploy.json').hosting).toEqual(fb.hosting))
+
+test('dist/admin は公開しない（手作業で firebase deploy しても /admin/ が出ない）', () =>
+  expect(fb.hosting.ignore).toContain('admin/**'))

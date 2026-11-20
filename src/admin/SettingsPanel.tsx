@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { canSetMatchCount, competitionTotals, parseScoreInput, sortByOrder } from '../shared/scoring'
-import type { Competition, Settings } from '../shared/types'
-import { updateCompetition, updateSettings } from './adminApi'
+import type { CapMode, Competition, Settings } from '../shared/types'
+import { setResultsHidden, updateCompetition, updateSettings } from './adminApi'
 import { errorKindOf } from './useSave'
 
 type Props = {
@@ -18,6 +18,15 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
   const [presets, setPresets] = useState(c.presets.join(', '))
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null)
   const [confirmReveal, setConfirmReveal] = useState(false)
+  // The reveal confirmation disarms itself, so a stray tap later can't publish (RED-004).
+  const revealTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const armReveal = () => {
+    setConfirmReveal(true)
+    clearTimeout(revealTimer.current)
+    revealTimer.current = setTimeout(() => setConfirmReveal(false), 5000)
+  }
+  const disarmReveal = () => { clearTimeout(revealTimer.current); setConfirmReveal(false) }
+  useEffect(() => () => clearTimeout(revealTimer.current), [])
 
   useEffect(() => {
     setName(c.name); setMax(String(c.max)); setPresets(c.presets.join(', ')); setMessage(null)
@@ -56,6 +65,21 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
     void run(() => updateCompetition(c.id, { name: trimmed, max: m.value, presets: values }), '競技の設定')
   }
 
+  // Switching modes must not strand existing scores above the new cap (they could then
+  // not even be lowered, since every write is checked against the cap).
+  const changeCapMode = (mode: CapMode) => {
+    const over = competitions.find(x => {
+      if (!x.capped) return false
+      const t = competitionTotals(x)
+      return mode === 'shared' ? t.blue + t.white > x.max : Math.max(t.blue, t.white) > x.max
+    })
+    if (over) {
+      const t = competitionTotals(over)
+      return fail(`${over.name}が青 ${t.blue}・白 ${t.white} 点で、新しい数え方の満点 ${over.max} 点を超えているため切り替えられません。先に点数を直してください`)
+    }
+    void run(() => updateSettings({ capMode: mode }), '満点の数え方', mode === 'shared' ? '青と白の合計で満点まで' : 'チームごとに満点まで')
+  }
+
   const hideTarget = sortByOrder(competitions).find(x => x.order === settings.hideFromOrder)
 
   return (
@@ -82,7 +106,8 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
       </label>
       <label className="field">
         <span className="field__label">よく使う点数（カンマ区切り）</span>
-        <input className="field__input" inputMode="numeric" value={presets} onChange={e => setPresets(e.target.value)} />
+        {/* No numeric inputMode: iOS would then offer digits only and no comma. */}
+        <input className="field__input" value={presets} onChange={e => setPresets(e.target.value)} />
       </label>
       <button className="btn btn--primary" type="button" onClick={saveCompetition}>競技の設定を保存</button>
 
@@ -90,12 +115,12 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
         <legend className="field__label">満点の数え方（全競技共通）</legend>
         <label className="radio">
           <input type="radio" name="capMode" checked={settings.capMode === 'shared'}
-            onChange={() => void run(() => updateSettings({ capMode: 'shared' }), '満点の数え方', '青と白の合計で満点まで')} />
+            onChange={() => changeCapMode('shared')} />
           青と白の合計で満点まで
         </label>
         <label className="radio">
           <input type="radio" name="capMode" checked={settings.capMode === 'perTeam'}
-            onChange={() => void run(() => updateSettings({ capMode: 'perTeam' }), '満点の数え方', 'チームごとに満点まで')} />
+            onChange={() => changeCapMode('perTeam')} />
           チームごとに満点まで
         </label>
       </fieldset>
@@ -111,15 +136,21 @@ export function SettingsPanel({ competition: c, competitions, settings, onSaved 
         </label>
         {settings.hidden ? (
           confirmReveal ? (
-            <button className="btn btn--danger" type="button"
-              onClick={() => { setConfirmReveal(false); void run(() => updateSettings({ hidden: false }), '結果を発表しました', '表示画面に合計が出ます') }}>
-              本当に発表する
-            </button>
+            <div className="confirm" role="group" aria-label="発表の確認">
+              <p className="confirm__text">表示画面に合計点と隠した競技の点数が出ます。元には戻せません。</p>
+              <div className="confirm__actions">
+                <button className="btn" type="button" onClick={disarmReveal}>キャンセル</button>
+                <button className="btn btn--danger" type="button"
+                  onClick={() => { disarmReveal(); void run(() => setResultsHidden(false, settings.hideFromOrder, competitions), '結果を発表しました', '表示画面に合計が出ます') }}>
+                  本当に発表する
+                </button>
+              </div>
+            </div>
           ) : (
-            <button className="btn btn--primary" type="button" onClick={() => setConfirmReveal(true)}>発表する</button>
+            <button className="btn btn--primary" type="button" onClick={armReveal}>発表する</button>
           )
         ) : (
-          <button className="btn" type="button" onClick={() => void run(() => updateSettings({ hidden: true }), '結果を隠しました', '表示画面は「?」になります')}>
+          <button className="btn" type="button" onClick={() => void run(() => setResultsHidden(true, settings.hideFromOrder, competitions), '結果を隠しました', '表示画面は「?」になります')}>
             {hideTarget ? `${hideTarget.name}から隠す` : '隠す'}
           </button>
         )}

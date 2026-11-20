@@ -4,6 +4,7 @@ import { collection, disableNetwork, doc, enableNetwork, getDocs, getFirestore, 
 import { initializeApp } from 'firebase/app'
 import { connectFirestoreEmulator } from 'firebase/firestore'
 import { makeEnv } from './rules-helpers'
+import { SEED_COMPETITIONS } from '../src/shared/seed'
 
 const EMAIL = 'scorer@sportsday.test'
 const PASS = 'test-passcode-1234'
@@ -35,6 +36,13 @@ function waitFor(pred: (b: import('../src/shared/subscribe').BoardState) => bool
     off = sub.subscribeBoard(b => { if (pred(b)) { clearTimeout(timer); queueMicrotask(off); resolve(b) } }, opts)
   })
 }
+
+
+// What setResultsHidden does, done directly (the display tests run signed out).
+const hideE = (hidden: boolean) => env.withSecurityRulesDisabled(async ctx => {
+  await updateDoc(doc(ctx.firestore(), 'competitions', 'E'), { hidden })
+  await updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden })
+})
 
 beforeAll(async () => {
   const uid = await createScorer()
@@ -123,6 +131,18 @@ test('settings だけ消えていても、seedIfEmpty が作り直す（競技�
   expect(b.competitions.find(c => c.id === 'C')!.scores['1'].blue).toBe(40)
 })
 
+test('setResultsHidden は settings と、hideFromOrder 以降の競技の hidden をまとめて切り替える', async () => {
+  await api.seedIfEmpty()
+  await api.setResultsHidden(true, 4, SEED_COMPETITIONS)
+  const read = async () => {
+    const snap = await getDocs(collection(fb.db, 'competitions'))
+    return Object.fromEntries(snap.docs.map(d => [d.id, d.data().hidden ?? false]))
+  }
+  expect(await read()).toEqual({ A: false, B: false, C: true, D: false, E: true })
+  await api.setResultsHidden(false, 4, SEED_COMPETITIONS)
+  expect(await read()).toEqual({ A: false, B: false, C: false, D: false, E: false })
+})
+
 test('updateCompetition と updateSettings が反映される', async () => {
   await api.seedIfEmpty()
   await api.updateCompetition('D', { name: '新しい競技', matchCount: 3 })
@@ -143,10 +163,10 @@ describe('未ログインの表示画面', () => {
   test('hidden=true にすると E を competitions から外し、hiddenIds に E を入れる。戻すと再び含める', async () => {
     await api.signOutScorer()
     await waitFor(b => b.competitions.length === 5)
-    await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden: true }))
+    await hideE(true)
     const hidden = await waitFor(b => b.settings?.hidden === true && b.hiddenIds.includes('E'))
     expect(hidden.competitions.map(c => c.id).sort()).toEqual(['A', 'B', 'C', 'D'])
-    await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden: false }))
+    await hideE(false)
     const back = await waitFor(b => b.settings?.hidden === false && b.competitions.find(c => c.id === 'E')?.scores['1']?.blue === 50)
     expect(back.hiddenIds).toEqual([])
     expect(back.competitions.find(c => c.id === 'E')!.scores['1'].blue).toBe(50)
@@ -163,9 +183,9 @@ describe('未ログインの表示画面', () => {
     })
     try {
       await new Promise(r => setTimeout(r, 500))
-      await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden: true }))
+      await hideE(true)
       await new Promise(r => setTimeout(r, 800))
-      await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), 'settings', 'app'), { hidden: false }))
+      await hideE(false)
       await Promise.race([back, new Promise((_, rej) => setTimeout(() => rej(new Error('E did not come back')), 8000))])
     } finally { off() }
     expect(seen.some(b => b.settings?.hidden === true && b.hiddenIds.includes('E'))).toBe(true)
@@ -184,7 +204,7 @@ describe('未ログインの表示画面', () => {
       () => { denied = true })
     try {
       await new Promise(r => setTimeout(r, 500))
-      await api.updateSettings({ hidden: true })
+      await api.setResultsHidden(true, 5, SEED_COMPETITIONS)
       await new Promise(r => setTimeout(r, 500))
       await api.setScore('E', 2, 'white', 30, 0)
       await new Promise(r => setTimeout(r, 1000))
@@ -194,7 +214,7 @@ describe('未ログインの表示画面', () => {
   })
 
   test('最初から hidden=true でも、E は hiddenIds に入る', async () => {
-    await api.updateSettings({ hidden: true })
+    await api.setResultsHidden(true, 5, SEED_COMPETITIONS)
     await api.signOutScorer()
     const b = await waitFor(b => b.settings?.hidden === true && b.hiddenIds.includes('E') && b.competitions.length === 4)
     expect(b.competitions.some(c => c.id === 'E')).toBe(false)

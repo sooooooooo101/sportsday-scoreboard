@@ -81,6 +81,19 @@ test('permission-denied 以外のエラーでは、最後のデータを残し�
   } finally { vi.useRealTimers() }
 })
 
+test('競技の一時エラーから再購読に成功したら connected を true に戻す', () => {
+  vi.useFakeTimers()
+  try {
+    settings()
+    for (const id of ['A', 'B', 'C', 'D', 'E']) deliver(id)
+    listeners.get('competitions/C')!.error({ code: 'unavailable' })
+    expect(last.connected).toBe(false)
+    vi.advanceTimersByTime(30_000)
+    deliver('C')
+    expect(last.connected).toBe(true)
+  } finally { vi.useRealTimers() }
+})
+
 test('settings のエラーでも再購読する', () => {
   vi.useFakeTimers()
   try {

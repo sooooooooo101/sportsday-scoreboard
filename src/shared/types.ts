@@ -11,6 +11,8 @@ export type Competition = {
   max: number
   /** false = totals may exceed max (玉入れ uses raw ball points). Each value is still ≤ MAX_SCORE. */
   capped: boolean
+  /** Set by hide/reveal on competitions from hideFromOrder on; the rules deny public reads while true. */
+  hidden?: boolean
   presets: number[]
   /** Keyed by match number "1".."10". Missing matches count as 0. */
   scores: Record<string, MatchScore>
