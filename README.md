@@ -131,3 +131,7 @@ npm run build
 ## 開発の進め方
 
 設計書（[docs/superpowers/specs](docs/superpowers/specs)）と実装計画（[docs/superpowers/plans](docs/superpowers/plans)）を先に書き、テストを先に書いてから実装しました。実装には Claude Code を使っています。
+
+## ライセンス
+
+[MIT](LICENSE)
