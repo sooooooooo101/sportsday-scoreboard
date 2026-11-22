@@ -35,12 +35,13 @@ button, input { font: inherit; color: inherit; }
 }
 :focus-visible { outline: 3px solid #7aa2ff; outline-offset: 2px; }
 
-/* Team name badge, shared by the display and scoring screens */
+/* Team name badge, shared by the display and scoring screens.
+   Japanese text is capped at weight 700: Hiragino looks smeared at 800–900. */
 .team-badge {
   display: inline-block;
   padding: var(--space-1) var(--space-4);
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.1em;
   line-height: 1.4;
 }

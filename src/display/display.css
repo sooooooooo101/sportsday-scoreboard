@@ -47,7 +47,8 @@
   max-width: 100%;
   /* Sized by width so four digits still fit a 320px phone */
   font-size: clamp(4.5rem, 28vw, 12rem);
-  font-weight: 900;
+  /* Digits only: the Latin system font stays crisp at 800 (Japanese text is capped at 700) */
+  font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -63,7 +64,7 @@
   color: #fff;
   text-align: center;
   font-size: 1.0625rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 .reveal-note::before {
   content: "?";
@@ -71,7 +72,7 @@
   width: 24px; height: 24px;
   border-radius: 50%;
   background: #fff; color: var(--ink);
-  font-size: 0.875rem; font-weight: 900;
+  font-size: 0.875rem; font-weight: 700;
 }
 
 .breakdown__list { list-style: none; margin: 0; padding: 0; }
@@ -113,14 +114,14 @@
   width: 1.75rem; height: 1.75rem;
   border-radius: var(--radius-s);
   background: var(--ink);
-  font-size: 0.875rem; font-weight: 800; color: #fff;
+  font-size: 0.875rem; font-weight: 700; color: #fff;
 }
 /* Long names wrap so they can be read without tapping */
 .breakdown__name { font-weight: 600; line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
 .breakdown__score {
   text-align: right;
   font-size: 1.375rem;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .breakdown__score--blue { color: var(--blue); }
@@ -155,7 +156,7 @@
   background: var(--surface);
   box-shadow: inset 0 0 0 2px var(--ink);
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
