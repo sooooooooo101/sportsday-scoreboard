@@ -21,7 +21,7 @@ export function TeamPanel({ team, total, partial }: { team: Team; total: number;
   return (
     <section className={`team team--${team}`} aria-label={label}>
       <motion.div className="team__flash" initial={{ opacity: 0 }} animate={flash} aria-hidden />
-      <h2 className="team__name">{TEAM_LABEL[team]}</h2>
+      <h2 className="team__name"><span className="team-badge">{TEAM_LABEL[team]}</span></h2>
       {/* The animated number changes every frame; screen readers get only the settled value. */}
       <p className="visually-hidden" role="status">{label}</p>
       <p className="team__total" data-testid={`total-${team}`} aria-hidden="true">

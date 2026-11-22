@@ -112,7 +112,11 @@ export function Scorer({ board }: { board: BoardState }) {
         </div>
       </header>
 
-      <h1 className="admin__title">{comp.name}{settings.hidden && comp.order >= settings.hideFromOrder && <span className="badge">非公開中</span>}</h1>
+      <div className="admin__heading">
+        <h1 className="admin__title">{comp.name}{settings.hidden && comp.order >= settings.hideFromOrder && <span className="badge">非公開中</span>}</h1>
+        {/* Where am I: competition letter and the selected match, at a glance */}
+        <p className="admin__context" data-testid="admin-context">{comp.id}・{showSettings ? '設定' : matchLabel(comp, match)}</p>
+      </div>
 
       {showSettings ? (
         <div role="tabpanel" id="score-panel" aria-labelledby={tabId('comp', comp.id)} className="panel">

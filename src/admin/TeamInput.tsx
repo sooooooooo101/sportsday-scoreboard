@@ -30,7 +30,7 @@ export function TeamInput({ team, value, presets, onCommit, onRawCommit }: Props
 
   return (
     <div className={`pad pad--${team}`} role="group" aria-label={label}>
-      <p className="pad__name">{label}</p>
+      <p className="pad__name"><span className="team-badge">{label}</span></p>
       <div className="pad__row">
         <button className="pad__step" type="button" aria-label="1点減らす" disabled={value <= 0} onClick={() => onCommit(value - 1)}>−</button>
         {editing ? (

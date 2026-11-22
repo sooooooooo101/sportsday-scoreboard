@@ -64,6 +64,7 @@ export function TallyCounter({ storageKey, team, mode, onDecide }: Props) {
 
   return (
     <div className={`tally tally--${team}`} role="group" aria-label={`${TEAM_LABEL[team]}の途中計算`}>
+      <p className="tally__title" aria-hidden="true">{TEAM_LABEL[team]}の途中計算</p>
       {mode === 'bonus' ? (
         <>
           {row('plus', 'ボーナス', '入ったボーナス玉', '＋')}

@@ -78,6 +78,14 @@ describe('得点入力', () => {
     expect(within(screen.getByRole('tablist', { name: '試合' })).getAllByRole('tab')).toHaveLength(2)
   })
 
+  test('競技名の下に、選んでいる競技と試合が表示される', async () => {
+    const { user } = setup()
+    expect(screen.getByTestId('admin-context')).toHaveTextContent('A・第1試合')
+    await user.click(screen.getByRole('tab', { name: /玉入れ改/ }))
+    await user.click(screen.getByRole('tab', { name: 'ボーナス' }))
+    expect(screen.getByTestId('admin-context')).toHaveTextContent('B・ボーナス')
+  })
+
   test('＋を押すと setScore(id, match, team, 現在値+1) が呼ばれる', async () => {
     current = board({ competitions: comps({ A: { '1': { blue: 7, white: 5 } } }) })
     const { user } = setup()
