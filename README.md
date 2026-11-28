@@ -128,6 +128,10 @@ npm run build
 
 各競技の点数の付け方は [docs/reference/競技部門A-E_抽出.md](docs/reference/競技部門A-E_抽出.md) にまとめています。満点は 1 競技につき青と白の合計で 100 点です。ただし玉入れだけは 1 チーム最大 98 点（ラウンド 1・2 は 80 点まで、ボーナスは 18 点まで）なので、合計が 100 点を超えてもよい設定にしています。
 
+## 来年の引き継ぎ
+
+AI ツールを使えない担当者でも作業できる手順書を [docs/HANDOVER.txt](docs/HANDOVER.txt) に置いています。作り直さずに使い続けるコースと、合言葉や管理画面の URL を作り直して公開し直すコースの 2 つを、順番に実行できる形で書いています。
+
 ## 開発の進め方
 
 設計書（[docs/superpowers/specs](docs/superpowers/specs)）と実装計画（[docs/superpowers/plans](docs/superpowers/plans)）を先に書き、テストを先に書いてから実装しました。実装には Claude Code を使っています。
